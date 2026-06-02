@@ -34,6 +34,14 @@ CREATE TABLE IF NOT EXISTS iv_snapshots (
 )
 """
 
+_CREATE_COT_SQL = """
+CREATE TABLE IF NOT EXISTS cot_snapshots (
+    date        TEXT PRIMARY KEY,
+    fetched_utc TEXT NOT NULL,
+    data        TEXT NOT NULL
+)
+"""
+
 
 def _conn() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +57,7 @@ def _init() -> None:
     with closing(_conn()) as c:
         c.execute(_CREATE_SNAPSHOTS_SQL)
         c.execute(_CREATE_IV_SQL)
+        c.execute(_CREATE_COT_SQL)
         c.commit()
     _initialized = True
 
@@ -170,3 +179,39 @@ def compute_iv_rank(current_iv: float) -> Optional[float]:
         return None
     below = sum(1 for v in values if v < current_iv)
     return round(below / len(values) * 100, 1)
+
+
+# ── COT snapshot store ────────────────────────────────────────────────────────
+
+def save_cot(cot: dict) -> None:
+    _init()
+    with closing(_conn()) as c:
+        c.execute(
+            "INSERT OR REPLACE INTO cot_snapshots (date, fetched_utc, data) VALUES (?, ?, ?)",
+            (cot["date"], datetime.now(timezone.utc).isoformat(), json.dumps(cot)),
+        )
+        c.commit()
+
+
+def load_cot_latest() -> Optional[dict]:
+    """Most recent COT snapshot."""
+    _init()
+    with closing(_conn()) as c:
+        row = c.execute(
+            "SELECT data, fetched_utc FROM cot_snapshots ORDER BY date DESC LIMIT 1"
+        ).fetchone()
+    if not row:
+        return None
+    d = json.loads(row[0])
+    d["fetched_utc"] = row[1]
+    return d
+
+
+def load_cot_history(weeks: int = 52) -> list[dict]:
+    """Return up to `weeks` COT snapshots in chronological order (oldest first)."""
+    _init()
+    with closing(_conn()) as c:
+        rows = c.execute(
+            "SELECT data FROM cot_snapshots ORDER BY date DESC LIMIT ?", (weeks,)
+        ).fetchall()
+    return [json.loads(r[0]) for r in reversed(rows)]

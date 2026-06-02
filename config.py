@@ -219,6 +219,39 @@ INFRASTRUCTURE_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
+# ── World market indices (for World Markets tab) ─────────────────────────────
+WORLD_MARKET_TICKERS: dict[str, str] = {
+    "S&P 500":       "^GSPC",
+    "Nasdaq":        "^IXIC",
+    "FTSE 100":      "^FTSE",
+    "DAX":           "^GDAXI",
+    "Nikkei 225":    "^N225",
+    "Hang Seng":     "^HSI",
+    "Shanghai":      "000001.SS",
+    "ASX 200":       "^AXJO",
+    "IBOVESPA":      "^BVSP",
+    "KOSPI":         "^KS11",
+    "EM (EEM)":      "EEM",
+    "VIX":           "^VIX",
+}
+
+# ── COT (CFTC Commitment of Traders) ─────────────────────────────────────────
+COT_URL = "https://www.cftc.gov/dea/newcot/deacot.txt"
+COT_COPPER_NAME = "COPPER- #1"
+
+# ── Central bank keyword filter (for World Market AI brief) ──────────────────
+CENTRAL_BANK_KEYWORDS: dict[str, list[str]] = {
+    "bullish": [
+        "rate cut", "dovish pivot", "easing cycle", "quantitative easing",
+        "stimulus", "rate hold", "pause", "lower rates", "cut rates",
+    ],
+    "bearish": [
+        "rate hike", "hawkish", "tightening", "quantitative tightening",
+        "higher for longer", "inflation concern", "restrictive policy",
+        "hike rates", "raise rates",
+    ],
+}
+
 # ── Thesis break conditions (displayed in dashboard) ─────────────────────────
 THESIS_BREAKS: list[str] = [
     "China PMI below 48 for 2+ consecutive months",
