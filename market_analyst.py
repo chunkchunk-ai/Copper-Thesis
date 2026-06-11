@@ -1,6 +1,6 @@
 """
 World market data, dealer gamma (GEX), CFTC COT, and cross-asset AI briefs.
-All fetch functions return None on failure — callers must handle gracefully.
+All fetch functions return None on failure - callers must handle gracefully.
 """
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def fetch_cot_copper() -> Optional[dict]:
         df = pd.read_csv(io.StringIO(r.text), low_memory=False)
         df.columns = [c.strip() for c in df.columns]
 
-        # Find the copper row — market name column varies by year
+        # Find the copper row - market name column varies by year
         name_col = next(
             (c for c in df.columns if "market" in c.lower() and "exchange" in c.lower()),
             df.columns[0],
@@ -214,13 +214,25 @@ def fetch_spy_gamma() -> Optional[dict]:
                 if df.empty:
                     continue
                 for _, opt in df.iterrows():
-                    K      = float(opt.get("strike", 0))
+                    K      = float(opt.get("strike", 0) or 0)
                     oi     = float(opt.get("openInterest") or 0)
+                    vol    = float(opt.get("volume") or 0)
                     iv     = float(opt.get("impliedVolatility") or 0)
-                    if K <= 0 or oi <= 0 or iv <= 0.01:
+                    # NaN guard: NaN is truthy so `or 0` doesn't catch yfinance NaNs.
+                    if K != K or oi != oi: oi = 0.0
+                    if vol != vol: vol = 0.0
+                    if iv != iv: iv = 0.0
+                    # yfinance/Yahoo frequently returns 0 openInterest for SPY
+                    # (especially puts and near-dated expiries). Fall back to
+                    # today's volume as a dealer-exposure proxy when OI is missing.
+                    contracts = oi if oi > 0 else vol
+                    # Cap pathological IVs (deep ITM/OTM yfinance often reports >5.0)
+                    if K <= 0 or contracts <= 0 or iv <= 0.01 or iv > 3.0:
                         continue
                     gamma  = _bs_gamma(spot, K, T, r_rate, iv)
-                    gex    = sign * gamma * oi * 100.0 * (spot ** 2) * 0.01
+                    if gamma != gamma:  # NaN guard on gamma output
+                        continue
+                    gex    = sign * gamma * contracts * 100.0 * (spot ** 2) * 0.01
                     strike_gex[K] = strike_gex.get(K, 0.0) + gex
 
         if not strike_gex:
@@ -324,11 +336,11 @@ def generate_market_implications(
         mkt_table  = _world_market_table({k: v for k, v in world_markets.items() if k != "VIX"})
 
         system_prompt = (
-            "You are a senior cross-asset macro analyst. You understand how copper — "
-            "as the leading industrial metal — signals broader economic conditions. "
+            "You are a senior cross-asset macro analyst. You understand how copper - "
+            "as the leading industrial metal - signals broader economic conditions. "
             "Your job is to reason from a copper thesis signal to second-order market implications "
             "across equities, bonds, FX, commodities, and emerging markets. "
-            "Be specific with directional language. Write flowing analyst prose — no bullets, no headers."
+            "Be specific with directional language. Write flowing analyst prose - no bullets, no headers."
         )
 
         user_msg = f"""Copper thesis scores today:
@@ -382,7 +394,7 @@ def generate_world_market_brief(
         system_prompt = (
             "You are a global macro strategist. You monitor equity, FX, and rates markets "
             "across all major regions and track central bank policy divergence. "
-            "Write concise, insight-dense analyst prose — no bullets, no headers."
+            "Write concise, insight-dense analyst prose - no bullets, no headers."
         )
 
         user_msg = f"""World market performance today:
